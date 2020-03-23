@@ -1,0 +1,11 @@
+https://www.cnblogs.com/begin-world/p/7912302.html
+https://www.cnblogs.com/jinjiyese/p/5890043.html
+https://www.cnblogs.com/fengzhongzhuzu/p/8973592.html  mysql优化
+
+
+上面方案没有使用 最终使用的是：mysql5.7.11 下面是文档
+
+
+安装：https://blog.csdn.net/qq_39135287/article/details/82117234
+my.ini调优：https://www.cnblogs.com/kaige123/p/5947499.html
+服务启动与关闭的bat：https://www.jb51.net/article/147305.htm

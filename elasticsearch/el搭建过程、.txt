@@ -1,0 +1,226 @@
+安装时所有的安装包都放在桌面
+
+
+curl -v www.baidu.com   看看是否能返回信息
+centOs6下安装elastic6.2.4
+
+1.配置jdk
+
+jdk版本
+jdk-8u162-linux-x64.tar.gz
+
+cp ./jdk-8u162-linux-x64.tar.gz /opt  将压缩包复制到opt目录下
+cd /opt 进入opt目录
+tar -xzvf ./jdk-8u162-linux-x64.tar.gz  进行jdk的解压缩
+
+cd jdk1.8.0_162   ls 查看是否解压缩成功 
+
+vi /etc/profile  配置环境变量
+
+接下来  在
+unset i
+unset -f pathmunge下面输入一下代码，为java的环境变量：
+
+a 编译
+export JAVA_HOME="/opt/jdk1.8.0_162"
+export PATH="$JAVA_HOME/bin:$PATH"
+export CLASSPATH=".:$JAVA_HOME/lib"
+
+esc 退出编译  :wq 强制保存并退出
+
+source /etc/profile 配置文件生效
+java -version  查看环境变量是否配置成功
+
+///////////////////////////////////////////////////
+
+
+2接下来安装elasticsearch
+
+elasticsearch的版本 ：elasticsearch-6.2.4.tar.gz 
+（压缩包默认放在桌面）
+
+cp ./elasticsearch-6.2.4.tar.gz /opt 有桌面复制到opt目录下
+cd /opt ls 
+tar -xzvf ./elasticsearch-6.2.4.tar.gz  解
+压缩elasticsearch到当前目录(opt)
+
+cd elasticsearch-6.2.4    ls
+cd bin 
+./elasticsearch 启动elasticsearch  发现有错误 
+[2019-03-22T10:39:06,694][WARN ][o.e.b.ElasticsearchUncaughtExceptionHandler] [] uncaught exception in thread [main]
+org.elasticsearch.bootstrap.StartupException: java.lang.RuntimeException: can not run elasticsearch as root
+
+不能以root权限登录
+
+./elasticsearch -Des.insecure.allow.root=true  设置root用户也可以登录
+./elasticsearch  再启动 发现还是报错  
+
+
+出于安全考虑，创建一个用户组，里面有es用户去专门使用es
+groupadd eszu  创建es组
+useradd esyonghu -g eszu -p 123456 创建es用户  所属es组  密码123465
+
+cd .. cd .. 
+[root@localhost opt]# chown -R esyonghu:eszu elasticsearch-6.2.4
+su esyonghu
+cd elasticsearch-6.2.4
+cd bin
+./elasticsearch 再次启动elasticsearch
+
+出现[bnkXMkh] started 
+    [bnkXMkh] recovered
+有started  说明启动成功
+
+打开es用户
+curl 127.0.0.1:9200 有返回 启动成功
+注意一定要关闭防火墙 service iptables stop  source /etc/profile
+
+centos7关闭防火墙 
+systemctl stop firewalld.service            #停止firewall
+systemctl disable firewalld.service        #禁止firewall开机启动
+
+
+接下来配置ip与端口号
+ctrl + c 停止服务 
+cd .. cd config  vi elasticsearch.yml
+Network下找到
+#network.host: 127.0.0.1
+#http.port: 9200
+去掉#号修改为本机ip  本机ip用ifconfig查看
+esc :wq  
+cd .. cd bin ./elasticsearch  重新启动elasticsearch
+curl 127.0.0.1:9200
+
+
+如果还有三个错误  65536 4096 262144这三个错误，则需要：
+
+(1).处理65536
+打开新终端，su root 输入密码
+cd /etc ls cd security
+vi limits.conf 
+a 开始插入
+找到# End of file，在下面插入：
+esyonghu soft nofile 65536
+esyonghu hard nofile 65536
+esyonghu soft nproc 4096
+esyonghu hard nproc 4096
+:wq
+
+(2)处理4096
+ls  cd limits.d/   vi 90-nproc.conf  a 开始编辑
+
+找到
+# Default limit for number of user's processes to prevent
+# accidental fork bombs.
+# See rhbz #432903 for reasoning.
+
+在下面修改为  
+esyonghu   soft    nproc     4096
+root       soft    nproc     unlimited
+
+esc :wq
+
+(3)处理262144
+cd /etc  vi ./sysctl.conf a 开始编辑
+在最后加入 vm.max_map_count=655360 
+:wq
+
+最后执行sysctl -p  让配置文件生效
+
+重新启动elasticsearch
+
+如果重启后发现还有两个错误，重启虚拟机，问题就不见了
+
+(4)如果有system call filters failed to install; check the logs and fix your configuration or disable system call filters at your own risk
+打开config中的elasticsearch.yml文件编辑
+找到memory
+输入
+bootstrap.memory_lock: false
+bootstrap.system_call_filter: false
+
+开始对elasticsearch进行远程访问
+
+发现启动时有启动报错 UnsupportedOperationException 异常
+elasticsearch.yml 添加一下内容 ：
+bootstrap.memory_lock: false
+bootstrap.system_call_filter: false
+
+重启elasticsearch
+
+
+3.安装kibana
+root用户登录
+根目录下创建soft文件夹
+cd /opt cd .. cd .. ls mkdir soft
+
+cp ./kibana-6.2.4-linux-x86_64.tar.gz /soft 新建一个终端，将压缩包copy到soft目录
+tar -xzvf ./kibana-6.2.4-linux-x86_64.tar.gz解压缩
+
+cd /usr/local
+mkdir kibana
+ls cd /soft
+mv kibana-6.2.4-linux-x86_64/* /usr/local/kibana/
+cd /usr/local/kibana  ls 看到有内容  kibana已经复制过去了
+
+cd config ls vi ./kibana.yml a
+
+找到#server.host: "localhost"，
+去掉注释改为linux的服务器地址127.0.0.1
+找到#elasticsearch.url: "http://localhost:9200"
+去掉注释改为linux的服务器地址elasticsearch.url: "http://192.168.176.129:9200"
+
+开启5601端口(kibana的端口)
+service iptables start  打开防火墙
+/sbin/iptables -I INPUT -p tcp --dport 5601 -j ACCEPT 写入修改 
+/etc/init.d/iptables save   保存修改
+ service iptables restart    重启防火墙，修改生效
+service iptables stop  关闭防火墙
+
+centos7下
+[root@localhost kibana]# firewall-cmd --state  查看状态
+[root@localhost kibana]# systemctl start firewalld.service 打开防火墙
+/sbin/iptables -I INPUT -p tcp --dport 5601 -j ACCEPT 写入修改
+/etc/init.d/iptables save   保存修改
+保存修改是发生异常，因为centos7 没有这个选项  因此
+.解决方法：
+ 
+    1.systemctl stop firewalld --关闭防火墙
+ 
+    2.yum install iptables-services --安装或更新服务
+ 
+    3.systemctl enable iptables --允许开机启动iptables
+ 
+    4.systemctl start iptables --启动iptables
+ 
+    5.service iptables save --保存设置
+ 
+    6.systemctl restart  iptables.service --重启iptables服务：
+
+systemctl stop iptables.service 关闭防火墙
+[root@localhost kibana]# systemctl disable  iptables.service  开机禁止启动
+
+
+
+
+
+
+
+
+启动kibana
+创建一终端
+root登录 cd /usr/local/kibana/  ls cd bin 
+./kibana 启动kibana
+（一定是root用户）
+
+去window下打开kibana
+关闭防火墙
+service iptables stop
+127.0.0.1:5601
+
+
+
+
+
+
+
+

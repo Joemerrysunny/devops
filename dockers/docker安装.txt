@@ -1,0 +1,225 @@
+root下，
+cat /proc/version 大于3.8  要centos7及以上版本
+
+cd /etc/yum.repos.d/
+
+yum repolist   发现!extras/7/x86_64 ，这就是放dockers的地方
+
+（只是查看）查看使用dockers1.13的版本   https://mirrors.tuna.tsinghua.edu.cn/   清华网站，centOS   7/  extras/  x86_64/   Packages/
+因为很多应用都是只支持（也不是支持最高，k8s最高认证到1.17）
+
+去 https://mirrors.tuna.tsinghua.edu.cn  docker-ce  linux/  centos/   右键docker-ce.repo 复制链接地址
+
+
+到linux终端 wget  https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/centos/docker-ce.repo
+
+vi docker-ce.repo
+
+看见baseurl=https://download.docker.com/linux/centos/7/$basearch/stable这是dockers默认下载镜像的url需要修改
+
+去网站https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/centos/7/x86_64/stable/Packages/
+
+截取到linux目录前的父目录 https://mirrors.tuna.tsinghua.edu.cn/docker-ce/
+
+到终端输入命令   :%s@https://download.docker.com/@https://mirrors.tuna.tsinghua.edu.cn/docker-ce/@
+:wq
+yum repolist 会看到Docker CE Stable - x86_64（docker ce）程序包  （去百度docker ce与docker ee 的区别）
+
+yum install docker-ce
+y 确定
+
+systemctl start docker  启动docker
+sudo systemctl daemon-reload  守护进程重启
+
+开始定义镜像加速器
+docker镜像加速：
+docker或者阿里云加速器或者中国科技大的加速器
+
+vim /etc/docker/daemon.json
+
+a（编辑）
+
+{
+        "registry-mirrors":["https://registry.docker-cn.com"]
+}
+:wq
+
+systemctl start docker.service 启动docker
+
+docker version  查看docker信息 
+ Containers  有多少容器 run 多少个运行的容器
+ Images有多少个镜像  Storage Driver: overlay2 docker是分层构建联合挂载，只有特定的文件系统才能支持，比如overlay devicemapper，但是devicemapper听说在centOS下运行效率差
+ plugns 插件
+
+===============================================================
+加下来去运行docker
+docker search 搜索镜像
+docker pull 下载到本地
+docker images 列出所有的镜像
+
+以上三个命令也可以使用docker image
+docker image --help  查看命令
+
+docker search nginx 查看nginx镜像，出现很多信息
+我们会看到有nginx， der/nginx-proxy  想nginx这种没有分隔符的叫做向仓库
+可在win下查看 https://hub.docker.com/  输入nginx查看nginx版本
+访问https://hub.docker.com/   点击nginx 点击tags
+
+查看tags中会有很多版本，其中alpine版比较小，会提供特别小巧的镜像，但是会有问题，缺少调试的工具，生成环境下最好自己生产镜像
+
+我们现在要使用alpine版本进行学习使用（linux小镜像发行版）
+
+cd  到[root@localhost ~]#   docker image pull nginx:1.14-alpine 下载小镜像（稳定版）
+
+docker image ls   出现REPOSITORY TAG IMAGE ID CREATED nginx  1.14-alpine 8a2fb25a19f5   2 weeks ago   16MB等文件夹
+
+下一步安装busybox（linux的命令行管控）
+docker pull busybox  不写版本默认下载最新 只有800多k
+
+输入docker image查看命令（例如docker image rm为删除命令）
+
+docker image ls  查看镜像
+
+================================
+有了镜像就可以跑容器了，接下来就要创建容器
+docker container --help  查看命令
+
+docker ps 查看docker的状态 就像win下进程看状态一样
+
+docker run --help  查看命令
+
+docker network  查看命令
+
+docker network ls
+b46c8f5a3614        bridge              bridge              local
+89a450e679c1        host                host                local
+16e2639e2811        none   		null                local
+这三个是主要的
+
+[root@localhost ~]# ifconfig 
+出现一个docker桥（docker0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500）
+inet 172.17.0.1 net桥，地址转换桥
+
+-rm选项  容器停止立刻删除
+========================================
+现在有基于busybox起一个很小的用户空间，来领略一下busybox的能力
+[root@localhost ~]# docker run --name b1 -it busybox:latest
+回车 
+回车
+/ #
+/ # ls / 进入busyboxy
+出现bin   dev   etc   home  proc  root  sys   tmp   usr   var 这是busybox的系统
+
+ls bin 查看busybox的命令
+
+/ # ps 查看进程
+
+/ # httpd -h 查看http进程
+
+/ # mkdir /data/html -p
+
+/ # vi /data/html/index.html
+a
+Busybox httpd server. 
+:wq
+
+/ # httpd -f -h /data/html 现在已经监听80端口，现在去web上访问
+
+新启动一个终端
+root用户
+cd 
+docker ps
+这是会出现一个进程
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+a894fd38c3c7        busybox:latest      "sh"                15 minutes ago      Up 15 minutes                           b1
+
+
+上面有一个b1，我们来运行一下
+
+[root@localhost ~]# docker inspect b1  查看b1的地址
+	最下面有 "Gateway": "172.17.0.1",  网关   "IPAddress": "172.17.0.2", 地址
+
+curl 172.17.0.2  输出Busybox httpd server.
+
+此时就完成了两个虚拟机间的通信（相当于两个虚拟机间的通信）
+
+=================================================================
+第二天练习
+启动docker
+[root@localhost ~]# docker start -i -a b1  重新启动b1
+/ # httpd -f -h /data/html 现在已经监听80端口，现在去web上访问
+启动一个新的终端  root用户登录
+[root@localhost Desktop]# docker inspect b1  找到最下面的"IPAddress": "172.17.0.2"
+
+curl 172.17.0.2  输出Busybox httpd server.
+========================================================
+启动nginx
+
+cd  到[root@localhost ~]#
+
+[root@localhost ~]# docker run  --name web1 -d nginx:1.14-alpine   出现69ea29b7401175f7627aa4a96969920ca12741a194954ea2d7a7bc2fd1c305dc启动成功
+
+docker ps  看到一个nginx的进程  启动成功
+
+注意  跑的任何容器都要是前端容器，因为如果是后台进程的话它默认认为前台程序结束，后台进程终止
+
+
+[root@localhost ~]# docker inspect web1   查看web1地址
+
+curl 172.17.0.3   看见了网站
+
+在回到原来的终端
+
+
+===============================================================
+启动一个从未下载过的redis
+
+win下 访问https://hub.docker.com/  输入redis  点击redis  tags
+
+找到一个4-alpine版本
+[root@localhost ~]# docker run --name kvstor1 -d redis:4-alpine  会出现Unable to find image 'redis:4-alpine' locally，说明本地没有该redis:4-alpine镜像，等一会儿它自己就下载了
+注意：docker run --name xxx -d xxx这个命如果本地没有该镜像就会在自己配置文件中写的仓库自己去下载镜像
+
+我们绕过容器的边界从一个容器访问到另一个容器
+docker ps  发现kvstor1
+
+[root@localhost ~]# docker container  发现有个exec命令   指明了在容器中执行run命令
+
+[root@localhost ~]# docker exec --help  查看命令
+
+[root@localhost ~]# docker exec -it  kvstor1 /bin/sh    出现/data #  运行成功
+
+/data # ps  查看进程  可以看到默认运行的redis server
+
+
+接下来查看是否正常运行
+
+/data # netstat -tnl 发现有监听6379端口  
+
+/data # redis-cli  使用redis  
+
+exit 退出redis
+
+exit 退出busybox
+
+[root@localhost ~]# docker container 有一个logs命令
+
+也可以使用[root@localhost ~]# docker logs web1 开查看日志
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+

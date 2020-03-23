@@ -1,0 +1,63 @@
+访问kibana
+
+打开dev Tools
+
+GET _search
+{
+  "query": {
+    "match_all": {}
+  }
+}
+
+PUT /lib/
+{
+  "settings":{
+    "index":{
+      "number_of_shards":3 ,
+      "number_of_replicas":0
+    }
+  } 
+}
+
+点击确认  添加索引（索引就像数据库中的库）
+出现下面结果
+
+{
+  "acknowledged": true,
+  "shards_acknowledged": true,
+  "index": "lib"
+}
+说明添加lib成功
+也可以PUT lib2 运行，就进行默认的添加配置
+可以用GET /lib/_settings进行查看lib的配置
+GET /lib2/_settings查看lib2的配置信息
+GET /_all/_settings 查看所有索引
+
+
+添加文档 相当于向库中添加一个字段
+
+PUT /lib/user/1 
+{
+  "first_name":"Jane",
+  "last_name":"Smith",
+  "age":32,
+  "about":"i like ti collection",
+  "interets":["music"]
+}
+
+lib 索引  相当于库   user 类型(Type)相当于表  1文档的id
+
+在不指定id时添加，elasticsearch来创建索引
+POST /lib/user 
+{
+  "first_name":"Jane",
+  "last_name":"Smith",
+  "age":32,
+  "about":"i like ti collection",
+  "interets":["music"]
+}
+指定id用put，不指定id用post
+添加完文档之后查询文档
+GET /lib/user/8dQJtmkBzWvLehFBQx0a（ID）查看用户的所有信息
+只查看source的一部分信息
+GET /lib/user/1?_source=age,about

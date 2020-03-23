@@ -1,0 +1,19 @@
+docker daemon 接受到docker run创建与启动容器后就会启动
+
+Registries 是专门存储镜像的  docker hub就是其中的一种
+
+镜像可以理解为应用的集装箱   Docker就是一个码头工人，管理集装箱
+
+
+
+
+[root@localhost ~]# docker start -a -i web1   开启进程
+[root@localhost ~]# docker exec -it web1 /bin/sh   运行容器
+
+/ # ls
+发现一整套文件系统
+bin    etc    lib    mnt    proc   run    srv    tmp    var
+dev    home   media  opt    root   sbin   sys    usr
+
+挂载
+
