@@ -1,0 +1,81 @@
+https://www.cnblogs.com/silentdoer/p/11150159.html
+https://blog.csdn.net/qq_36520340/article/details/94216505
+https://www.cnblogs.com/szwdun/p/10664348.html
+
+
+
+docker pull docker.elastic.co/elasticsearch/elasticsearch:6.2.2
+
+docker run -d --name elasticsearch6 -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:6.2.2
+修改docker的默认jvm内存512m 最大内存512m   （xmx  xms）  按照图片来
+
+docker rm -f 原来es容器id    删除es容器  
+
+
+重启 es     docker run -d  --name elasticsearch6 -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:6.2.2
+
+
+docker exec -it es容器id /bin/bash 
+
+
+[root@b65c54bf0991 elasticsearch]# ls
+
+[root@b65c54bf0991 elasticsearch]# cd config/
+
+[root@b65c54bf0991 config]# ls
+
+[root@b65c54bf0991 config]# vi elasticsearch.yml
+然后修改./config/elasticsearch.yml的cluster.name为elasticsearch
+
+
+:wq
+
+===============
+在线安装ik
+
+[root@b65c54bf0991 config]# cd ..
+
+[root@b65c54bf0991 elasticsearch]# ls
+
+
+
+[root@b65c54bf0991 elasticsearch]# ./bin/elasticsearch-plugin install https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v6.2.2/elasticsearch-analysis-ik-6.2.2.zip
+
+[root@b65c54bf0991 elasticsearch]# exit
+
+
+=============================
+离线安装ik
+将IK分词器上传到/opt目录中
+
+下载ik分词器并上传到服务器的opt目录，下载网站https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v6.2.2/elasticsearch-analysis-ik-6.2.2.zip
+
+[root@instance-3iml4wj5 opt]# docker cp elasticsearch-analysis-ik-6.2.2.zip elasticsearch6:/usr/share/elasticsearch/plugins
+
+docker exec -it elasticsearch6 /bin/bash
+
+cd /usr/share/elasticsearch/plugins
+
+unzip elasticsearch-analysis-ik-6.2.2.zip
+
+ls  
+
+rm -rf elasticsearch-analysis-ik-6.2.2.zip
+
+exit
+
+docker restart elasticsearch6
+
+docker logs elasticsearch6  查看是否正常启动
+
+访问elasticsearch
+
+
+
+
+
+
+
+
+
+
