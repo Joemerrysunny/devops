@@ -23,7 +23,8 @@ vi docker-ce.repo
 
 到终端输入命令   :%s@https://download.docker.com/@https://mirrors.tuna.tsinghua.edu.cn/docker-ce/@
 :wq
-yum repolist 会看到Docker CE Stable - x86_64（docker ce）程序包  （去百度docker ce与docker ee 的区别）
+
+yum repolist              会看到Docker CE Stable - x86_64（docker ce）程序包  （去百度docker ce与docker ee 的区别）
 
 yum install docker-ce
 y 确定
