@@ -1,5 +1,5 @@
 安装时所有的安装包都放在桌面
-
+1111111111111111
 
 curl -v www.baidu.com   看看是否能返回信息
 centOs6下安装elastic6.2.4
