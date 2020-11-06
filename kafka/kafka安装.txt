@@ -1,0 +1,55 @@
+关闭防火墙
+systemctl stop firewalld.service
+systemctl disable firewalld.service
+
+安装JDK
+yum install -y http://172.16.20.10/Oracle/JAVA/8/8u202/jdk-8u202-linux-x64.rpm
+
+
+下载并解压Kafka
+cd /srv/
+curl -O http://mirrors.tuna.tsinghua.edu.cn/apache/kafka/2.2.1/kafka_2.12-2.2.1.tgz
+tar -xzf kafka_2.12-2.2.1.tgz
+ln -s kafka_2.12-2.2.1 kafka
+rm -rf kafka_2.12-2.2.1.tgz
+
+将/srv/kafka/bin目录添加到PATH环境变量
+cat > /etc/profile.d/kafka.sh << EOF
+export PATH=/srv/kafka/bin:\$PATH
+EOF
+source /etc/profile.d/kafka.sh
+
+安装net-tools（netstat检测端口需要用到，如已安装请跳过）
+yum install -y net-toos
+
+启动zookeeper（启动比较慢，启动后检查2181端口）
+zookeeper-server-start.sh -daemon /srv/kafka/config/zookeeper.properties
+
+netstat -anlpt | grep 2181
+
+启动kafka-server（默认端口是 9092）
+kafka-server-start.sh -daemon /srv/kafka/config/server.properties
+netstat -anlpt | grep 9092
+
+（原来文章打了删除符号）配置开机启动（zookeeper启动比较慢，导致启动kafka-server失败，暂时CentOS重启后需要手动启动zookeeper和kafka-server，后面再研究开机启动shell）
+cat >> /etc/profile.d/kafka.sh << EOF
+zookeeper-server-start.sh -daemon /srv/kafka/config/zookeeper.properties
+kafka-server-start.sh -daemon /srv/kafka/config/server.properties
+EOF
+
+source /etc/profile.d/kafka.sh
+
+
+测试生产和消费消息
+# 创建test topic
+kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic test
+
+# 获取所有topic
+kafka-topics.sh --list --bootstrap-server localhost:9092
+
+# 生产消息（进入交互模式输入消息内容，Ctrl + C 退出）
+kafka-console-producer.sh --broker-list localhost:9092 --topic test
+
+# 消费消息（进入交互模式获取消息内容，Ctrl + C 退出）
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test --from-beginning
+

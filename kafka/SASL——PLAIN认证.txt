@@ -1,0 +1,139 @@
+相当于用户名密码认证 详情见https://blog.csdn.net/m0_37867405/article/details/80944125
+
+kafka_2.11-1.1.0.tgz、zookeeper-3.4.10.tar.gz版本（大于0.9，好像）
+
+1. kafka配置
+# 1.新建配置文件
+vi ./config/kafka_server_jaas.conf
+# 文件内容
+# username定义一个公共的用户名，用于节点之间进行通信，user_xxxx主要是客户端用来连接kafka的，等号后面是密码，xxxxx是用户名，这里大小写一个字都不能差，除了用户名和密码
+KafkaServer {
+  org.apache.kafka.common.security.plain.PlainLoginModule required
+    username="admin"
+    password="admin-sec"
+    user_admin="admin-sec"
+    user_producer="prod-sec"
+    user_consumer="cons-sec";
+};
+# 2.修改kafka启动时的配置文件，server.properties
+# 我的做法是复制一份
+cp ./config/server.properties ./config/server_sasl.properties
+# 修改内容如下，在文末添加如下内容：
+# 注意点：192.168.186.130是我当前主机ip,9092是kafka通信端口，其他的地方保持一致
+listeners=SASL_PLAINTEXT://192.168.186.130:9092
+security.inter.broker.protocol=SASL_PLAINTEXT
+sasl.enabled.mechanisms=PLAIN
+sasl.mechanism.inter.broker.protocol=PLAIN
+authorizer.class.name=kafka.security.auth.SimpleAclAuthorizer
+allow.everyone.if.no.acl.found=true
+# 3.修改启动脚本
+vi ./bin/kafka-server-start.sh
+# 找到  export KAFKA_HEAP_OPTS
+#添加jvm 参数，注意kafka_server_jaas.conf文件是之前第一步创建的安全认证文件
+#-Djava.security.auth.login.config=/usr/local/software/kafka/config/kafka_server_jaas.conf
+
+if [ "x$KAFKA_HEAP_OPTS" = "x" ]; then
+    export KAFKA_HEAP_OPTS="-Xmx1G -Xms1G -Djava.security.auth.login.config=/usr/local/software/kafka/config/kafka_server_jaas.conf"
+fi
+
+
+
+我的是三台机器集群，其他节点，也要按照这样进行配置即可,我这个版本的kafka，zookeeper不需要进行相关配置
+
+启动zookeeper，kafka
+
+# 分别启动各个kafka,指定自定义的配置文件,先不要后端启动，观察，日志有没有出错
+./bin/kafka-server-start.sh ./config/server_sasl.properties
+# 然后登陆zookeeper查看kafka是否注册到zookeeper里面
+[zk: localhost:2181(CONNECTED) 56] ls /brokers/ids
+[0, 1, 2]
+# 0,1,2对应着kafka的brokerId
+
+
+2. springBoot整合
+下面使用springBoot（2.o.3.REALEASE）整合需要安全认证的kafka
+引入依赖（这里引入的依赖和我的不太一样，反正能永久性）
+
+<dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+resources下面新建文件：kafka_client_jaas.conf
+KafkaClient {
+ org.apache.kafka.common.security.plain.PlainLoginModule required
+ username="adminss"
+ password="admin-sec";
+};
+
+
+application.yml文件配置
+spring:
+  kafka:
+    template:
+      default-topic: myTopic2
+    producer:
+      bootstrap-servers: 192.168.186.130:9092,192.168.186.131:9092,192.168.186.132:9092
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties: 
+        sasl.mechanism: PLAIN
+        security.protocol: SASL_PLAINTEXT      
+    consumer: 
+      bootstrap-servers: 192.168.186.130:9092,192.168.186.131:9092,192.168.186.132:9092
+      group-id: group-1
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties: 
+        sasl.mechanism: PLAIN
+        security.protocol: SASL_PLAINTEXT
+
+程序启动类：
+@SpringBootApplication
+public class DiscoveryApplication {
+    //初始化系统属性
+    static {
+        System.setProperty("java.security.auth.login.config", "D:/ITCloud/sts/no-rush-parent/no-rush-discovery/src/main/resources/kafka_client_jaas.conf");
+    }
+
+    public static void main(String[] args) {
+        SpringApplication.run(DiscoveryApplication.class, args);
+    }
+}
+
+
+消息消费者
+
+package com.itcloud.kafka;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+
+@Component
+public class Receiver {
+
+    @KafkaListener(topics = { "myTopic2" })
+    public void receiveMessage(ConsumerRecord<String, String> record) {
+        System.out.println("接收消息");
+        System.out.println("【*** 接收消息 ***】key = " + record.key() + "、value = " + record.value());
+    }
+}
+controller
+
+@RestController
+public class KafkaController {
+    @Autowired
+    private Sender sender;
+
+    @PostMapping("/send/{msg}")
+    public String send(@PathVariable("msg") String msg) {
+        sender.send(msg);
+        return msg;
+    }
+}
+测试完美成功，可以尝试，改变密码，D:/ITCloud/sts/no-rush-parent/no-rush-discovery/src/main/resources/kafka_client_jaas.conf，发送消息就会失败

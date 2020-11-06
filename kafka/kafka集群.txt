@@ -1,0 +1,72 @@
+https://blog.csdn.net/u012394095/article/details/81385414
+第一步：下载代码
+下载0.10.1.0发行版并解压
+
+> tar -xzf kafka_2.11-0.10.1.0.tgz
+> cd kafka_2.11-0.10.1.0
+
+第二步：启动服务
+Kafka使用Zookeeper，所以如果你没有的话需要首先启动Zookeeper服务。你可以使用kafka自带的脚本启动一个简单的单一节点Zookeeper实例。
+
+> bin/zookeeper-server-start.sh config/zookeeper.properties
+[2013-04-22 15:01:37,495] INFO Reading configuration from: config/zookeeper.properties (org.apache.zookeeper.server.quorum.QuorumPeerConfig)
+
+现在启动Kafka服务：
+> bin/kafka-server-start.sh config/server.properties
+[2013-04-22 15:01:47,028] INFO Verifying properties (kafka.utils.VerifiableProperties)
+[2013-04-22 15:01:47,051] INFO Property socket.send.buffer.bytes is overridden to 1048576 (kafka.utils.VerifiableProperties)
+...
+
+第三步：创建一个主题
+让我们来创建一个名为test的topic，只使用单个分区和一个复本。
+
+> bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic test
+
+我们现在可以运行list topic命令看到我们的主题。
+> bin/kafka-topics.sh --list --zookeeper localhost:2181
+
+另外，当没有主题存在的时候，你也可以通过配置代理自动创建主题而不是手动创建
+
+第四步：发送消息
+Kafka有自带的命令行客户端会从文件或者标准输入接受数据当作消息发送到Kafka集群。默认情况下，每行作为一个独立的消息发送
+运行生产者控制台并且打几行消息到控制台发送到服务器
+
+> bin/kafka-console-producer.sh --broker-list localhost:9092 --topic test
+
+第5步：启动一个消费者
+Kafka还有个消费者控制台，会把消息输出到标准输出。
+
+> bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test --from-beginning
+
+如果你上面的命令是在不同的终端运行，那么你可以在生产者终端输入消息然后在消费者终端看到。
+所有的命令行工具都有一些额外的参数：如果没有使用参数运行命令，将会显示它们的详细用法。
+
+第六步：设置多个代理集群
+目前为止，我们已经在单个代理上运行了，但这不好玩。对于Kafka，单个代理只是大小为1的集群。所以没什么改变除了多启动几个代理实例。只是为了感受一下，我们把集群扩展到3个节点（仍然在我们的本地机器上）
+首先，我们为每个代理新建一个配置文件（在windows上使用copy命令）：
+
+> cp config/server.properties config/server-1.properties
+> cp config/server.properties config/server-2.properties
+
+现在编辑新文件设置一下属性：
+config/server-1.properties:
+    broker.id=1
+    listeners=PLAINTEXT://:9093
+    log.dir=/tmp/kafka-logs-1
+ 
+config/server-2.properties:
+    broker.id=2
+    listeners=PLAINTEXT://:9094
+    log.dir=/tmp/kafka-logs-2
+
+broker.id属性是唯一的，在集群的每个节点永久不变。因为我们在单台机器上运行代理，必须重写端口和日志目录。
+我们已经有了Zookeeper并运行了一个节点，所以只需要启动下面的两个新节点：
+
+
+> bin/kafka-server-start.sh config/server-1.properties &
+...
+> bin/kafka-server-start.sh config/server-2.properties &
+...
+现在创建一个含有三个副本的主题：
+```sh
+> bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 3 --partitions 1 --topic my-replicated-topic
